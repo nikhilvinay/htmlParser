@@ -81,19 +81,71 @@ class CricketSpider(scrapy.Spider):
 
     def getFirstInningsInformation(self , response):
     	firstInning = {"team":"","batsmen":[ ],"bowler":[ ] }
-		#batsmaninformation = { "name" : "" ,"dismissType" : "" , "run" : 0 , "balls" : 0 , "fours" : 0 , "six" : 0 , "strikeRate" : 0}
+		#batsmaninformation = {"name" : "" ,"dismissType" : "" , "run" : 0 , "balls" : 0 , "fours" : 0 , "six" : 0 , "strikeRate" : 0}
 
     	firstInningTeamInfo = response.css('#innings_1>div>div>span::text').extract()
     	firstInningTeamName = unicodedata.normalize('NFKD', firstInningTeamInfo[0]).encode('ascii','ignore')
     	 
     	inningsId = "innings_1"
-    	self.getBattingScoreCardInformation(inningsId , response)
+    	print self.getBattingScoreCardInformation(inningsId , response)
 
     	return firstInningTeamName
     def getBattingScoreCardInformation(self , inningsId , response):
-    	# NameOfBatsman = response.css('#'+inningsId+'>div>.cb-scrd-itms>.cb-col>.cb-text-link::text').extract()
-    	# dismisalType = response.css('#'+inningsId+'>div>.cb-scrd-itms>.cb-col>.text-gray::text').extract()
-    	# runs = response.css('#'+inningsId+'>div>.cb-scrd-itms>.cb-col.cb-col-8.text-right.text-bold::text').extract()
-    	# ballsTaken = response.css('#'+inningsId+'>div>.cb-scrd-itms>:nth-child(4)::text').extract()
-    	NameOfBatsman = response.css('#'+inningsId+'>div>.cb-scrd-itms:nth-child(2)').extract()
-    	print "Name Of batsman================>" , NameOfBatsman
+    	batsmenNames = []
+        bowlerNames = []
+        dismisalType = []
+        runs = []
+        ballsTaken = []
+    	dismisalType = response.css('#'+inningsId+'>div>.cb-scrd-itms>.cb-col>.text-gray::text').extract()
+        fours = []
+        six = []
+        strikeRate = []
+        parentDiv = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
+
+        #ballsTakenResponse = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
+        #runs = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
+
+        ##scrapping batsmenName & bowlerNames
+        for index, link in enumerate(parentDiv):
+            if index ==0 :
+                batsmenNames = link.css('.cb-scrd-itms>.cb-col>.cb-text-link::text').extract()
+            else :
+                bowlerNames = link.css('.cb-scrd-itms>.cb-col>.cb-text-link::text').extract()
+        
+        ##scrapping runs scored by each batsman
+        for index, link in enumerate(parentDiv):
+            if index == 0 :
+                runs = link.css('.cb-scrd-itms>.cb-col.cb-col-8.text-right.text-bold::text').extract()
+                runs = runs[:-2]
+
+        ##scrapping ballsTaken by each batsman
+        for index, link in enumerate(parentDiv):
+            if index == 0 :
+                ballsTaken = link.css('.cb-scrd-itms>:nth-child(4)::text').extract()
+
+        ##scrapping fours
+        for index, link in enumerate(parentDiv):
+            if index == 0 :
+                fours = link.css('.cb-scrd-itms>:nth-child(5)::text').extract()
+
+        ##scrapping six
+        for index, link in enumerate(parentDiv):
+            if index == 0 :
+                six = link.css('.cb-scrd-itms>:nth-child(6)::text').extract()
+
+        for index, link in enumerate(parentDiv):
+            if index == 0 :
+                strikeRate = link.css('.cb-scrd-itms>:nth-child(7)::text').extract()
+
+        batsmenNames = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(batsmenNames)]
+        bowlerNames = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(bowlerNames)]
+        dismisalType = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(dismisalType)]
+        runs = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(runs)]
+        ballsTaken = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(ballsTaken)]
+        fours = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(fours)]
+        six = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(six)]
+        strikeRate = [unicodedata.normalize('NFKD', el).encode('ascii','ignore') for i, el in enumerate(strikeRate)]
+
+        return {"batsmen" : batsmenNames , "bowlerNames" : bowlerNames , 
+        "dismisalType" : dismisalType , "runs" : runs , "ballsTaken" : ballsTaken 
+        , "fours" : fours , "six" : six , "strikeRate" : strikeRate}
