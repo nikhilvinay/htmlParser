@@ -5,12 +5,13 @@ import unicodedata
 
 class CricketSpider(scrapy.Spider):
     name = 'cricket'
-    # allowed_domains = ['www.reddit.com/r/gameofthrones/']
-    # start_urls = ['http://www.reddit.com/r/gameofthrones//']
-
     allowed_domains = ['www.cricbuzz.com/live-cricket-scorecard/19873/indw-vs-engw-6th-match-womens-t20i-triseries-in-india-2018']
     start_urls = ['http://www.cricbuzz.com/live-cricket-scorecard/19873/indw-vs-engw-6th-match-womens-t20i-triseries-in-india-2018']
 
+    ###########################################################################################################
+    	#Below functin is main function from where execution get starts
+    	#It will call other sub function who will be responsible for creation of final result
+    ###########################################################################################################
     def parse(self, response):
     	finalResponse = {}
     	matchInformation = self.parseMatchInformation(response)
@@ -36,39 +37,16 @@ class CricketSpider(scrapy.Spider):
 									      }
 									   }
 
-    	firstInningTeamName = self.getFirstInningsInformation(response)
-    	#yield matchInformation;
-    	#print "================================>"
-        #Extracting the content using css selectors
-        # titles = response.css('.title.may-blank::text').extract()
-        # votes = response.css('.score.unvoted::text').extract()
-        # times = response.css('time::attr(title)').extract()
-        # comments = response.css('.comments::text').extract()
-       
-        # #Give the extracted content row wise
-        # for item in zip(titles,votes,times,comments):
-        #     #create a dictionary to store the scraped info
-        #     scraped_info = {
-        #         'title' : item[0],
-        #         'vote' : item[1],
-        #         'created_at' : item[2],
-        #         'comments' : item[3],
-        #     }
+    	allInningsInformation = self.getAllInningsInformation(response)
+    	finalResponse["scoreCard"]["firstInning"] = allInningsInformation["firstInning"]
+    	finalResponse["scoreCard"]["secondInning"] = allInningsInformation["secondInning"]
+    	yield finalResponse
+    	#return finalResponse
+    ###########################################################################################################
+    	#Below function is used for getting all Match information.It will get overall match summary
+    	 
+    ###########################################################################################################
 
-        #     #yield or give the scraped info to scrapy
-        #     yield scraped_info
-
-        
-        #Give the extracted commentsntent row wise
-        # for item in zip(titles):
-        #     #create a dictionary to store the scraped info
-        #     #print "--->" , item[0]
-        #     scraped_info = {
-        #         'title' : item[0],
-        #     }
-
-        #     #yield or give the scraped info to scrapy
-        #     yield scraped_info
     def parseMatchInformation(self, response):
     	titles = response.css('.cb-mtch-info-itm>div::text').extract()
     	match_result = response.css('.cb-scrcrd-status::text').extract()
@@ -79,17 +57,69 @@ class CricketSpider(scrapy.Spider):
         match_info["match_result"] = unicodedata.normalize('NFKD', match_result[0]).encode('ascii','ignore')
         return match_info;
 
-    def getFirstInningsInformation(self , response):
-    	firstInning = {"team":"","batsmen":[ ],"bowler":[ ] }
-		#batsmaninformation = {"name" : "" ,"dismissType" : "" , "run" : 0 , "balls" : 0 , "fours" : 0 , "six" : 0 , "strikeRate" : 0}
+    ###########################################################################################################
+    	#Below function is used to get both innings information (First inning & Second inning)
+    ###########################################################################################################
 
+    def getAllInningsInformation(self , response):
+    	firstInning = {"team":"","batsmen":[ ],"bowler":[ ] }
+    	secondInning = {"team":"","batsmen":[ ],"bowler":[ ] }
+    	
     	firstInningTeamInfo = response.css('#innings_1>div>div>span::text').extract()
     	firstInningTeamName = unicodedata.normalize('NFKD', firstInningTeamInfo[0]).encode('ascii','ignore')
-    	 
-    	inningsId = "innings_1"
-    	print self.getBattingScoreCardInformation(inningsId , response)
 
-    	return firstInningTeamName
+    	secondInningTeamInfo = response.css('#innings_2>div>div>span::text').extract()
+    	secondInningTeamName = unicodedata.normalize('NFKD', secondInningTeamInfo[0]).encode('ascii','ignore')
+    	 
+    	firstInning["team"] = firstInningTeamName
+    	firstInningData  =  self.getBattingScoreCardInformation("innings_1" , response)
+    	firstInning["bowler"] =  firstInningData["bowlerNames"]
+    	firstInningbatsmen = self.createBatsmenData(firstInningData)
+    	firstInning["batsmen"] = firstInningbatsmen
+
+    	secondInning["team"] = secondInningTeamName
+    	secondInningData  =  self.getBattingScoreCardInformation("innings_2" , response)
+    	secondInning["bowler"] =  secondInningData["bowlerNames"]
+    	secondInningBatsmen = self.createBatsmenData(secondInningData)
+    	secondInning["batsmen"] =  secondInningBatsmen
+    	
+    	return {"firstInning" : firstInning , "secondInning" : secondInning}
+
+    ###########################################################################################################
+    	#Below function is used to create batsmen infromation
+    	#Example how many runs he has score , how many bowls he has taken and so on.
+    	#This function will take all batsmen data which will be get filtered as an output
+    	#It will return list of dictionry
+    ###########################################################################################################
+
+    def createBatsmenData(self , inningsData):
+    	batsmen = []
+    	batsmentInformation ={"name" : "" , "dismisalType" : "" , "runs" : 0 , "ballsTaken" : 0 , "fours" : 0 , "six" : 0 , "strikeRate" : 0} 
+    	batsmenNames = inningsData["batsmen"]
+    	dismisalType = inningsData["dismisalType"]
+    	runs = inningsData["runs"]
+    	ballsTaken = inningsData["ballsTaken"]
+    	fours = inningsData["fours"]
+    	six = inningsData["six"]
+    	strikeRate = inningsData["strikeRate"]
+    	
+
+    	for currentBatsmanIndex in range(len(batsmenNames)):
+    		batsmentInformation["name"] =  batsmenNames[currentBatsmanIndex]
+    		batsmentInformation["dismisalType"] = dismisalType[currentBatsmanIndex] if currentBatsmanIndex<len(dismisalType) else "Did Not Played"
+    		batsmentInformation["runs"] = runs[currentBatsmanIndex] if currentBatsmanIndex<len(runs) else 0
+    		batsmentInformation["ballsTaken"] =    ballsTaken[currentBatsmanIndex] if currentBatsmanIndex<len(ballsTaken) else 0
+    		batsmentInformation["fours"] =   fours[currentBatsmanIndex] if currentBatsmanIndex<len(fours) else 0
+    		batsmentInformation["six"] =  six[currentBatsmanIndex] if currentBatsmanIndex<len(six) else 0
+    		batsmentInformation["strikeRate"] =  strikeRate[currentBatsmanIndex] if currentBatsmanIndex<len(strikeRate) else 0
+    		batsmen.append(batsmentInformation.copy())
+    		currentBatsmanIndex = currentBatsmanIndex+1
+    	return batsmen
+    ###########################################################################################################
+    	#Below function is basically used for scrapping data from web page.
+    	#It will take inning id as a parameter . 
+    ###########################################################################################################
+
     def getBattingScoreCardInformation(self , inningsId , response):
     	batsmenNames = []
         bowlerNames = []
@@ -102,10 +132,6 @@ class CricketSpider(scrapy.Spider):
         strikeRate = []
         parentDiv = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
 
-        #ballsTakenResponse = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
-        #runs = response.css('#'+inningsId+'>.cb-ltst-wgt-hdr')
-
-        ##scrapping batsmenName & bowlerNames
         for index, link in enumerate(parentDiv):
             if index ==0 :
                 batsmenNames = link.css('.cb-scrd-itms>.cb-col>.cb-text-link::text').extract()
